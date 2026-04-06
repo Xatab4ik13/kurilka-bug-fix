@@ -1,0 +1,9 @@
+node_modules
+dist
+.git
+.github
+.lovable
+.workspace
+supabase
+*.log
+*.tsbuildinfo
