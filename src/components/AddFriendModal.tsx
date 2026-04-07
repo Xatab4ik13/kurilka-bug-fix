@@ -1,30 +1,64 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import GameIcon from '@/components/GameIcon';
+import { supabase } from '@/lib/supabase-vps';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
 
 interface AddFriendModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-const suggestedUsers = [
-  { id: 'su1', name: 'DragonSlayer', status: 'online' as const, game: 'Elden Ring' },
-  { id: 'su2', name: 'NightWolf', status: 'in-game' as const, game: 'CS2' },
-  { id: 'su3', name: 'PixelQueen', status: 'online' as const },
-  { id: 'su4', name: 'ShadowBlade', status: 'offline' as const },
-  { id: 'su5', name: 'CyberPunk77', status: 'online' as const, game: 'Cyberpunk 2077' },
-];
+interface SearchResult {
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  status: string;
+  avatar_url: string | null;
+}
 
 const AddFriendModal = ({ open, onClose }: AddFriendModalProps) => {
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
   const [sentRequests, setSentRequests] = useState<string[]>([]);
 
-  const filtered = suggestedUsers.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    if (!open || !user) return;
+    setSearch('');
+    setResults([]);
+    setSentRequests([]);
+  }, [open, user]);
 
-  const handleSend = (id: string) => {
-    setSentRequests(prev => [...prev, id]);
+  useEffect(() => {
+    if (!user || !open) return;
+
+    const searchUsers = async () => {
+      setLoading(true);
+      let query = supabase
+        .from('profiles')
+        .select('user_id, username, display_name, status, avatar_url')
+        .neq('user_id', user.id)
+        .limit(20);
+
+      if (search.trim()) {
+        query = query.ilike('username', `%${search.trim()}%`);
+      }
+
+      const { data } = await query;
+      setResults(data || []);
+      setLoading(false);
+    };
+
+    const timeout = setTimeout(searchUsers, 300);
+    return () => clearTimeout(timeout);
+  }, [search, user, open]);
+
+  const handleSend = (userId: string, username: string) => {
+    setSentRequests(prev => [...prev, userId]);
+    toast({ title: `Запрос отправлен ${username}` });
   };
 
   if (!open) return null;
@@ -55,37 +89,46 @@ const AddFriendModal = ({ open, onClose }: AddFriendModalProps) => {
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 outline-none"
               autoFocus
             />
+            {loading && (
+              <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            )}
           </div>
         </div>
 
         <div className="px-6 py-4 max-h-[300px] overflow-y-auto space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
-            {search ? 'Результаты' : 'Рекомендации'}
+            {search ? 'Результаты' : 'Пользователи'}
           </p>
-          {filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">Никого не найдено 😕</p>
+          {results.length === 0 && !loading ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {search ? 'Никого не найдено 😕' : 'Нет пользователей'}
+            </p>
           ) : (
-            filtered.map(user => {
-              const sent = sentRequests.includes(user.id);
+            results.map(profile => {
+              const sent = sentRequests.includes(profile.user_id);
               return (
-                <div key={user.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-secondary/40 transition-colors group">
+                <div key={profile.user_id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-secondary/40 transition-colors group">
                   <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/25 to-accent/25 flex items-center justify-center text-foreground text-[11px] font-bold">
-                      {user.name.slice(0, 2)}
-                    </div>
+                    {profile.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/25 to-accent/25 flex items-center justify-center text-foreground text-[11px] font-bold">
+                        {profile.username.slice(0, 2)}
+                      </div>
+                    )}
                     <div className={cn(
                       "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card",
-                      user.status === 'online' ? 'bg-primary' : user.status === 'in-game' ? 'bg-accent' : 'bg-muted-foreground/40'
+                      profile.status === 'online' ? 'bg-primary' : profile.status === 'afk' ? 'bg-yellow-500' : profile.status === 'dnd' ? 'bg-destructive' : 'bg-muted-foreground/40'
                     )} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-semibold text-foreground">{user.name}</p>
+                    <p className="text-[13px] font-semibold text-foreground">{profile.display_name || profile.username}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {user.game ? <span className="text-accent">{user.game}</span> : user.status === 'online' ? 'В сети' : 'Не в сети'}
+                      @{profile.username} · {profile.status === 'online' ? 'В сети' : profile.status === 'afk' ? 'Отошёл' : profile.status === 'dnd' ? 'Не беспокоить' : 'Не в сети'}
                     </p>
                   </div>
                   <button
-                    onClick={() => !sent && handleSend(user.id)}
+                    onClick={() => !sent && handleSend(profile.user_id, profile.username)}
                     disabled={sent}
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors",

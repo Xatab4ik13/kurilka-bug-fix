@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import GameIcon from '@/components/GameIcon';
 import { useAuth, ThemeId } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase-vps';
 import { toast } from '@/hooks/use-toast';
 import { Server, MemberRole } from '@/types/chat';
 import { useChannels, useServerMembers } from '@/hooks/useDatabase';

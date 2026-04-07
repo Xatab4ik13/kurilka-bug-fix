@@ -7,13 +7,13 @@ interface NotificationsDropdownProps {
   onClose: () => void;
 }
 
-const mockNotifications = [
-  { id: 'n1', type: 'friend' as const, text: 'DragonSlayer принял запрос в друзья', time: '2 мин назад', read: false },
-  { id: 'n2', type: 'mention' as const, text: 'Алексей упомянул тебя в #общий', time: '15 мин назад', read: false },
-  { id: 'n3', type: 'server' as const, text: 'Новый участник в WoW Гильдия', time: '1 час назад', read: true },
-  { id: 'n4', type: 'mention' as const, text: 'Мария ответила на твоё сообщение', time: '3 часа назад', read: true },
-  { id: 'n5', type: 'server' as const, text: 'Кинотусовка: голосование за фильм', time: 'Вчера', read: true },
-];
+interface Notification {
+  id: string;
+  type: 'friend' | 'mention' | 'server';
+  text: string;
+  time: string;
+  read: boolean;
+}
 
 const typeIcons: Record<string, string> = {
   friend: 'users',
@@ -23,7 +23,7 @@ const typeIcons: Record<string, string> = {
 
 const NotificationsDropdown = ({ open, onClose }: NotificationsDropdownProps) => {
   const ref = useRef<HTMLDivElement>(null);
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -53,26 +53,33 @@ const NotificationsDropdown = ({ open, onClose }: NotificationsDropdownProps) =>
         )}
       </div>
       <div className="max-h-[320px] overflow-y-auto">
-        {notifications.map(n => (
-          <div key={n.id} className={cn(
-            "flex items-start gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors cursor-pointer",
-            !n.read && "bg-primary/5"
-          )}>
-            <div className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
-              !n.read ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
-            )}>
-              <GameIcon name={typeIcons[n.type]} size={14} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className={cn("text-xs leading-relaxed", !n.read ? "text-foreground" : "text-muted-foreground")}>
-                {n.text}
-              </p>
-              <p className="text-[10px] text-muted-foreground/50 mt-0.5">{n.time}</p>
-            </div>
-            {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />}
+        {notifications.length === 0 ? (
+          <div className="py-10 text-center">
+            <GameIcon name="bell" size={24} className="text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground/50">Нет уведомлений</p>
           </div>
-        ))}
+        ) : (
+          notifications.map(n => (
+            <div key={n.id} className={cn(
+              "flex items-start gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors cursor-pointer",
+              !n.read && "bg-primary/5"
+            )}>
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
+                !n.read ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
+              )}>
+                <GameIcon name={typeIcons[n.type]} size={14} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-xs leading-relaxed", !n.read ? "text-foreground" : "text-muted-foreground")}>
+                  {n.text}
+                </p>
+                <p className="text-[10px] text-muted-foreground/50 mt-0.5">{n.time}</p>
+              </div>
+              {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

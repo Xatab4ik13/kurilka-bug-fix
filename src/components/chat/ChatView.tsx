@@ -293,14 +293,13 @@ const ChatView = ({ server, onBack, onOpenSettings }: ChatViewProps) => {
       {voiceConnected && (() => {
         const voiceCh = channels.find(c => c.id === voiceConnected);
         if (!voiceCh) return null;
-        const voiceParticipants = members.slice(0, 3).map((m, i) => ({
-          id: m.user_id,
-          name: m.profile?.username || 'Unknown',
-          speaking: i === 0,
-          muted: i === 2,
-        }));
         return (
-          <VoiceChannelPanel channelName={voiceCh.name} serverName={server.name} participants={voiceParticipants} onDisconnect={() => { setVoiceConnected(null); playDisconnectSound(); }} />
+          <VoiceChannelPanel
+            channelName={voiceCh.name}
+            serverName={server.name}
+            roomName={`server-${server.id}-${voiceCh.id}`}
+            onDisconnect={() => { setVoiceConnected(null); playDisconnectSound(); }}
+          />
         );
       })()}
     </div>

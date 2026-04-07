@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ServerCard from '@/components/chat/ServerCard';
 import ChatView from '@/components/chat/ChatView';
 import DirectChat from '@/components/chat/DirectChat';
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Server } from '@/types/chat';
 import { useAuth } from '@/hooks/useAuth';
 import { useServers, useAllProfiles } from '@/hooks/useDatabase';
+import { toast } from '@/hooks/use-toast';
 
 const statusOptions = [
   { value: 'online', label: 'В сети', color: 'bg-primary' },
@@ -28,7 +29,7 @@ interface IndexProps {
 
 const Index = ({ username, onLogout }: IndexProps) => {
   const { user, profile, updateProfile } = useAuth();
-  const { servers: dbServers, createServer, updateServer } = useServers();
+  const { servers: dbServers, createServer, updateServer, error: serversError } = useServers();
   const { profiles } = useAllProfiles();
 
   const [openServerId, setOpenServerId] = useState<string | null>(null);
@@ -68,6 +69,15 @@ const Index = ({ username, onLogout }: IndexProps) => {
 
   const currentStatusOption = statusOptions.find(s => s.value === myStatus) || statusOptions[0];
 
+  useEffect(() => {
+    if (!serversError) return;
+    toast({
+      title: 'Не удалось загрузить серверы',
+      description: serversError,
+      variant: 'destructive',
+    });
+  }, [serversError]);
+
   const handleFriendClick = (userId: string) => {
     setActiveDmUserId(userId);
     setUnreadCounts(prev => ({ ...prev, [userId]: 0 }));
@@ -88,7 +98,16 @@ const Index = ({ username, onLogout }: IndexProps) => {
   };
 
   const handleCreateServer = useCallback(async (data: { name: string; icon: string; gradient: string; channels: string[] }) => {
-    await createServer(data.name, data.icon, data.gradient, data.channels);
+    try {
+      await createServer(data.name, data.icon, data.gradient, data.channels);
+      toast({ title: 'Сервер создан' });
+    } catch (error) {
+      toast({
+        title: 'Не удалось создать сервер',
+        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        variant: 'destructive',
+      });
+    }
   }, [createServer]);
 
   return (

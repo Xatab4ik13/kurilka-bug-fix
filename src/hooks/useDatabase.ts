@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase-vps';
 import { useAuth } from './useAuth';
 
 export interface DbServer {
@@ -40,35 +40,54 @@ export const useServers = () => {
   const { user } = useAuth();
   const [servers, setServers] = useState<DbServer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchServers = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
+
+    setLoading(true);
+    setError(null);
+
+    const { data, error } = await supabase
       .from('servers')
       .select('*')
       .order('created_at', { ascending: false });
-    if (data) setServers(data as DbServer[]);
+
+    if (error) {
+      setError(error.message);
+      setServers([]);
+      setLoading(false);
+      return;
+    }
+
+    setServers((data || []) as DbServer[]);
     setLoading(false);
   }, [user]);
 
   useEffect(() => { fetchServers(); }, [fetchServers]);
 
   const createServer = async (name: string, icon: string, gradient: string, channelNames: string[]) => {
-    if (!user) return null;
+    if (!user) throw new Error('Нет активной сессии');
 
-    const { data: server, error } = await supabase
+    const { data: server, error: serverError } = await supabase
       .from('servers')
       .insert({ name, icon, gradient, owner_id: user.id })
       .select()
       .single();
 
-    if (error || !server) return null;
+    if (serverError || !server) {
+      throw new Error(serverError?.message || 'Не удалось создать сервер');
+    }
 
-    await supabase.from('server_members').insert({
+    const { error: memberError } = await supabase.from('server_members').insert({
       server_id: server.id,
       user_id: user.id,
       role: 'owner',
     });
+
+    if (memberError) {
+      throw new Error(memberError.message || 'Не удалось добавить владельца сервера');
+    }
 
     const channels = [
       ...channelNames.map((ch, i) => ({
@@ -79,18 +98,24 @@ export const useServers = () => {
       })),
       { server_id: server.id, name: 'Лобби', type: 'voice' as const, position: channelNames.length },
     ];
-    await supabase.from('channels').insert(channels);
+
+    const { error: channelsError } = await supabase.from('channels').insert(channels);
+
+    if (channelsError) {
+      throw new Error(channelsError.message || 'Не удалось создать каналы');
+    }
 
     await fetchServers();
     return server as DbServer;
   };
 
   const updateServer = async (id: string, updates: Partial<DbServer>) => {
-    await supabase.from('servers').update(updates).eq('id', id);
+    const { error } = await supabase.from('servers').update(updates).eq('id', id);
+    if (error) throw new Error(error.message);
     await fetchServers();
   };
 
-  return { servers, loading, createServer, updateServer, refetch: fetchServers };
+  return { servers, loading, error, createServer, updateServer, refetch: fetchServers };
 };
 
 export const useChannels = (serverId: string | null) => {

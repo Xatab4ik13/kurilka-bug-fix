@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import GameIcon from '@/components/GameIcon';
 import { useAuth, ThemeId } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase-vps';
 import { toast } from '@/hooks/use-toast';
 
 const THEMES: { id: ThemeId; name: string; bg: string; accent: string }[] = [
@@ -37,6 +37,27 @@ const ProfilePanel = ({ onClose, onLogout }: ProfilePanelProps) => {
     inputDevice: 'default', outputDevice: 'default', inputVolume: 80, outputVolume: 100,
     inputSensitivity: 45, noiseSuppression: true, echoCancellation: true, autoGainControl: true, voiceActivation: true,
   });
+  const [audioDevices, setAudioDevices] = useState<{ inputs: MediaDeviceInfo[]; outputs: MediaDeviceInfo[]; cameras: MediaDeviceInfo[] }>({
+    inputs: [], outputs: [], cameras: [],
+  });
+
+  useEffect(() => {
+    const enumerateDevices = async () => {
+      try {
+        // Request permission first to get device labels
+        await navigator.mediaDevices.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        setAudioDevices({
+          inputs: devices.filter(d => d.kind === 'audioinput'),
+          outputs: devices.filter(d => d.kind === 'audiooutput'),
+          cameras: devices.filter(d => d.kind === 'videoinput'),
+        });
+      } catch (err) {
+        console.error('Failed to enumerate devices:', err);
+      }
+    };
+    if (activeSection === 'audio') enumerateDevices();
+  }, [activeSection]);
 
   const sections = [
     { id: 'profile' as const, label: 'Профиль', icon: 'users' },
@@ -213,10 +234,32 @@ const ProfilePanel = ({ onClose, onLogout }: ProfilePanelProps) => {
                 <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 block">Устройство ввода (микрофон)</label>
                 <select value={audioSettings.inputDevice} onChange={e => setAudioSettings(prev => ({ ...prev, inputDevice: e.target.value }))}
                   className="w-full bg-card rounded-xl px-4 py-3 text-sm text-foreground neon-border outline-none appearance-none cursor-pointer">
-                  <option value="default">По умолчанию — Встроенный микрофон</option>
-                  <option value="headset">Гарнитура USB</option>
+                  <option value="default">По умолчанию</option>
+                  {audioDevices.inputs.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>{d.label || `Микрофон ${d.deviceId.slice(0, 8)}`}</option>
+                  ))}
                 </select>
               </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 block">Устройство вывода (динамик)</label>
+                <select value={audioSettings.outputDevice} onChange={e => setAudioSettings(prev => ({ ...prev, outputDevice: e.target.value }))}
+                  className="w-full bg-card rounded-xl px-4 py-3 text-sm text-foreground neon-border outline-none appearance-none cursor-pointer">
+                  <option value="default">По умолчанию</option>
+                  {audioDevices.outputs.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>{d.label || `Динамик ${d.deviceId.slice(0, 8)}`}</option>
+                  ))}
+                </select>
+              </div>
+              {audioDevices.cameras.length > 0 && (
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 block">Камера</label>
+                  <select className="w-full bg-card rounded-xl px-4 py-3 text-sm text-foreground neon-border outline-none appearance-none cursor-pointer">
+                    {audioDevices.cameras.map(d => (
+                      <option key={d.deviceId} value={d.deviceId}>{d.label || `Камера ${d.deviceId.slice(0, 8)}`}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Громкость микрофона</label>

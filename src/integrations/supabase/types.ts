@@ -262,11 +262,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_channel: {
+        Args: { _channel_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_server_manager: {
+        Args: { _server_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_server_member: {
+        Args: { _server_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_server_owner: {
+        Args: { _server_id: string; _user_id: string }
         Returns: boolean
       }
     }
