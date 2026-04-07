@@ -77,6 +77,51 @@ const VideoTile = ({ participant, large }: { participant: Participant; large?: b
   );
 };
 
+const RemoteAudio = ({ participants }: { participants: Participant[] }) => {
+  const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  useEffect(() => {
+    const current = new Set<string>();
+    participants.forEach(p => {
+      if (p.audioTrack) {
+        current.add(p.identity);
+        let el = audioRefs.current.get(p.identity);
+        if (!el) {
+          el = document.createElement('audio');
+          el.autoplay = true;
+          (el as any).playsInline = true;
+          document.body.appendChild(el);
+          audioRefs.current.set(p.identity, el);
+        }
+        const stream = new MediaStream([p.audioTrack]);
+        if (el.srcObject !== stream) {
+          el.srcObject = stream;
+        }
+      }
+    });
+    // cleanup removed participants
+    audioRefs.current.forEach((el, id) => {
+      if (!current.has(id)) {
+        el.srcObject = null;
+        el.remove();
+        audioRefs.current.delete(id);
+      }
+    });
+  }, [participants]);
+
+  useEffect(() => {
+    return () => {
+      audioRefs.current.forEach(el => {
+        el.srcObject = null;
+        el.remove();
+      });
+      audioRefs.current.clear();
+    };
+  }, []);
+
+  return null;
+};
+
 const CallOverlay = ({ user, type, onEnd, roomName }: CallOverlayProps) => {
   const {
     connectionState, participants, localParticipant, connect, disconnect,
@@ -119,6 +164,7 @@ const CallOverlay = ({ user, type, onEnd, roomName }: CallOverlayProps) => {
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-background/98 animate-fade-in">
+      <RemoteAudio participants={participants} />
       <div className="h-12 flex items-center justify-between px-5 glass-strong border-b border-border/50">
         <div className="flex items-center gap-2">
           <span className={cn("w-2 h-2 rounded-full",
